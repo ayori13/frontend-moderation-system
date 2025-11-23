@@ -9,89 +9,97 @@ import type { AdsQueryParams } from "../../api/ads";
 const ListPage = () => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<AdsQueryParams>({});
-  const [sort, setSort] = useState<AdsQueryParams>({});
+  const [sort, setSort] = useState<Partial<AdsQueryParams>>({});
+
+  const queryParams: AdsQueryParams = {
+    page,
+    limit: 10,
+    ...filters,
+    ...sort,
+  };
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["ads", page, filters, sort],
-    queryFn: () =>
-      getAds({
-        page,
-        limit: 10,
-        ...filters,
-        ...sort,
-      }),
+    queryKey: ["ads", queryParams],
+    queryFn: () => getAds(queryParams),
   });
 
-  if (isLoading) return <div style={{ padding: "20px" }}>Загрузка...</div>;
-  if (isError) return <div style={{ padding: "20px" }}>Ошибка загрузки</div>;
+  if (isLoading) {
+    return <div className="page-status">Загрузка…</div>;
+  }
 
-  const ads = data?.ads || [];
+  if (isError) {
+    return (
+      <div className="page-status page-status--error">
+        Ошибка загрузки списка объявлений
+      </div>
+    );
+  }
+
+  const ads = data?.ads ?? [];
   const pagination = data?.pagination;
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1 style={{ marginBottom: "20px" }}>Список объявлений</h1>
-
-      <Filters
-        onChange={(f) => {
-          setFilters(f);
-          setPage(1);
-        }}
-      />
-
-      <SortPanel
-        onChange={(s) => {
-          setSort(s);
-          setPage(1);
-        }}
-      />
-
-      <div style={{ display: "grid", gap: "12px" }}>
-        {ads.map((ad) => (
-          <AdCard key={ad.id} ad={ad} />
-        ))}
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Список объявлений</h1>
+          {pagination && (
+            <div className="page-subtitle">
+              Всего объявлений: {pagination.totalItems}
+            </div>
+          )}
+        </div>
       </div>
 
-      {pagination && (
-        <div
-          style={{
-            marginTop: "20px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "6px",
-              cursor: page <= 1 ? "not-allowed" : "pointer",
+      <div className="page-layout page-layout--with-sidebar">
+        <aside className="page-sidebar">
+          <Filters
+            onChange={(f) => {
+              setFilters(f);
+              setPage(1);
             }}
-          >
-            Назад
-          </button>
+          />
+        </aside>
 
-          <span>
-            Страница {pagination.currentPage} из {pagination.totalPages}
-          </span>
-
-          <button
-            disabled={page >= pagination.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "6px",
-              cursor:
-                page >= pagination.totalPages ? "not-allowed" : "pointer",
+        <section className="page-content">
+          <SortPanel
+            onChange={(s) => {
+              setSort(s);
+              setPage(1);
             }}
-          >
-            Вперёд
-          </button>
-        </div>
-      )}
+          />
+
+          <div className="cards-list">
+            {ads.map((ad) => (
+              <AdCard key={ad.id} ad={ad} />
+            ))}
+          </div>
+
+          {pagination && (
+            <div className="pagination">
+              <button
+                className="btn btn-ghost"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Назад
+              </button>
+
+              <span className="pagination-info">
+                Страница {pagination.currentPage} из {pagination.totalPages}
+              </span>
+
+              <button
+                className="btn btn-ghost"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Вперёд
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 };

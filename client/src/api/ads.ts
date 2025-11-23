@@ -8,16 +8,24 @@ export interface AdsListResponse {
 }
 
 export interface AdsQueryParams {
-  page?: number;
-  limit?: number;
-  status?: AdStatus[]; 
-  categoryId?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
-  sortBy?: "createdAt" | "price" | "priority";
-  sortOrder?: "asc" | "desc";
-}
+    page?: number;
+    limit?: number;
+  
+    status?: AdStatus;
+    priority?: "urgent" | "normal";
+  
+    categoryId?: number;
+  
+    minPrice?: number;
+    maxPrice?: number;
+  
+    search?: string;
+  
+    sortBy?: "createdAt" | "price" | "priority";
+    sortOrder?: "asc" | "desc";
+  }
+  
+  
 
 export const getAds = async (params: AdsQueryParams) => {
   const { data } = await api.get<AdsListResponse>("/ads", { params });

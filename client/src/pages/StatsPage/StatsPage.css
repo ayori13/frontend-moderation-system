@@ -1,0 +1,88 @@
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .period-switch {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .period-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  
+  .period-btn:hover {
+    background: var(--bg-hover);
+  }
+  
+  .period-btn.active {
+    border-color: var(--avito-blue);
+    background: rgba(0, 140, 255, 0.12);
+    color: var(--avito-blue);
+  }
+  
+  .stats-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  
+  .stat-card {
+    padding: 16px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .stat-title {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-top: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .chart-panel {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+  }
+  
+  .chart-container {
+    flex: 1;
+    margin-top: 12px;
+  }
+  
+  .chart-container-small {
+    height: 250px;
+    margin-top: 12px;
+  }
+  
+  .avg-time {
+    font-size: 14px;
+    margin-top: 10px;
+    color: var(--text-muted);
+  }
+  

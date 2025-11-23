@@ -1,96 +1,68 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { Advertisement } from "../../types/ad";
 
 interface Props {
   ad: Advertisement;
 }
 
+const STATUS_LABEL: Record<Advertisement["status"], string> = {
+  pending: "На модерации",
+  approved: "Одобрено",
+  rejected: "Отклонено",
+  draft: "Черновик",
+};
+
 const AdCard = ({ ad }: Props) => {
-  const navigate = useNavigate();
+  const created = new Date(ad.createdAt).toLocaleDateString();
+  const priorityLabel = ad.priority === "urgent" ? "Срочное" : "Обычное";
 
   return (
-    <div
-      onClick={() => navigate(`/item/${ad.id}`)}
-      style={{
-        display: "flex",
-        gap: "12px",
-        padding: "12px",
-        border: "1px solid #ddd",
-        borderRadius: "8px",
-        cursor: "pointer",
-        transition: "0.2s",
-      }}
-    >
-      <img
-        src={ad.images[0]}
-        alt={ad.title}
-        style={{
-          width: "90px",
-          height: "90px",
-          borderRadius: "6px",
-          objectFit: "cover",
-        }}
-      />
-
-      <div style={{ flexGrow: 1 }}>
-        <div style={{ fontSize: "18px", fontWeight: 600 }}>{ad.title}</div>
-        <div style={{ marginTop: "4px" }}>{ad.price} ₽</div>
-
-        <div style={{ fontSize: "14px", marginTop: "4px", color: "#555" }}>
-          {ad.category} · {new Date(ad.createdAt).toLocaleDateString()}
-        </div>
-
-        <div style={{ marginTop: "6px", display: "flex", gap: "6px" }}>
-          <span
-            style={{
-              padding: "2px 6px",
-              fontSize: "12px",
-              borderRadius: "4px",
-              background:
-                ad.status === "approved"
-                  ? "#d4f7d4"
-                  : ad.status === "rejected"
-                  ? "#f7d4d4"
-                  : ad.status === "pending"
-                  ? "#f7f3d4"
-                  : "#eee",
-            }}
-          >
-            {ad.status}
-          </span>
-
-          {ad.priority === "urgent" && (
-            <span
-              style={{
-                padding: "2px 6px",
-                fontSize: "12px",
-                borderRadius: "4px",
-                background: "#ffcccc",
-              }}
-            >
-              срочно
-            </span>
-          )}
-        </div>
+    <article className="ad-card">
+      <div className="ad-card-media">
+        <img
+          src={ad.images[0]}
+          alt={ad.title}
+          className="ad-card-image"
+        />
       </div>
 
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          navigate(`/item/${ad.id}`);
-        }}
-        style={{
-          alignSelf: "center",
-          padding: "6px 12px",
-          borderRadius: "6px",
-          border: "1px solid #aaa",
-          background: "#f7f7f7",
-          cursor: "pointer",
-        }}
-      >
-        Открыть →
-      </button>
-    </div>
+      <div className="ad-card-body">
+        <header className="ad-card-header">
+          <div>
+            <h3 className="ad-card-title">{ad.title}</h3>
+            <div className="ad-card-meta">
+              <span>{ad.category}</span>
+              <span className="dot" />
+              <span>{created}</span>
+            </div>
+          </div>
+          <div className="ad-card-price">
+            {ad.price.toLocaleString()} ₽
+          </div>
+        </header>
+
+        <div className="ad-card-tags">
+          <span className={`badge badge--status badge--status-${ad.status}`}>
+            {STATUS_LABEL[ad.status]}
+          </span>
+          <span
+            className={
+              "badge badge--priority" +
+              (ad.priority === "urgent" ? " badge--priority-urgent" : "")
+            }
+          >
+            {priorityLabel}
+          </span>
+        </div>
+
+        <footer className="ad-card-footer">
+          <span className="muted">ID {ad.id}</span>
+          <Link to={`/item/${ad.id}`} className="btn btn-primary btn-sm">
+            Открыть →
+          </Link>
+        </footer>
+      </div>
+    </article>
   );
 };
 

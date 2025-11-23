@@ -1,19 +1,10 @@
 import { useState } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  getAdById,
-  approveAd,
-  rejectAd,
-  requestChanges,
-} from "../../api/ads";
-import type { Advertisement } from "../../types/ad";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getAdById, getAds, approveAd, rejectAd, requestChanges } from "../../api/ads";
+import "./ItemPage.css";
 
-const REASONS = [
+const ACTION_REASONS = [
   "Запрещенный товар",
   "Неверная категория",
   "Некорректное описание",
@@ -22,55 +13,53 @@ const REASONS = [
   "Другое",
 ];
 
-type ModalMode = "reject" | "changes" | null;
+type ModalMode = "reject" | "request" | null;
 
 const ItemPage = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const adId = Number(id);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
+  const [imgIndex, setImgIndex] = useState(0);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [selectedReason, setSelectedReason] = useState("");
   const [comment, setComment] = useState("");
 
-  const { data, isLoading, isError } = useQuery<Advertisement>({
+  const adQuery = useQuery({
     queryKey: ["ad", adId],
-    enabled: Number.isFinite(adId),
     queryFn: () => getAdById(adId),
   });
 
-  const approveMutation = useMutation({
-    mutationFn: () => approveAd(adId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ad", adId] });
-      queryClient.invalidateQueries({ queryKey: ["ads"] });
-    },
+  const listQuery = useQuery({
+    queryKey: ["all-ads"],
+    queryFn: () => getAds({ limit: 9999 }),
   });
 
-  const rejectMutation = useMutation({
-    mutationFn: (payload: { reason: string; comment?: string }) =>
-      rejectAd(adId, payload.reason, payload.comment),
+  const approve = useMutation({
+    mutationFn: () => approveAd(adId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ad", adId] }),
+  });
+
+  const reject = useMutation({
+    mutationFn: () => rejectAd(adId, selectedReason, comment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ad", adId] });
-      queryClient.invalidateQueries({ queryKey: ["ads"] });
+      qc.invalidateQueries({ queryKey: ["ad", adId] });
       closeModal();
     },
   });
 
-  const changesMutation = useMutation({
-    mutationFn: (payload: { reason: string; comment?: string }) =>
-      requestChanges(adId, payload.reason, payload.comment),
+  const request = useMutation({
+    mutationFn: () => requestChanges(adId, selectedReason, comment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ad", adId] });
-      queryClient.invalidateQueries({ queryKey: ["ads"] });
+      qc.invalidateQueries({ queryKey: ["ad", adId] });
       closeModal();
     },
   });
 
   const openModal = (mode: ModalMode) => {
     setModalMode(mode);
-    setSelectedReason(REASONS[0]);
+    setSelectedReason(ACTION_REASONS[0]);
     setComment("");
   };
 
@@ -80,299 +69,200 @@ const ItemPage = () => {
     setComment("");
   };
 
-  const handleSubmitModal = () => {
+  const handleSubmit = () => {
     if (!selectedReason) return;
-
-    const payload = { reason: selectedReason, comment: comment || undefined };
-
-    if (modalMode === "reject") {
-      rejectMutation.mutate(payload);
-    } else if (modalMode === "changes") {
-      changesMutation.mutate(payload);
-    }
+    if (modalMode === "reject") reject.mutate();
+    if (modalMode === "request") request.mutate();
   };
 
-  if (!Number.isFinite(adId)) {
-    return <div style={{ padding: 20 }}>Некорректный идентификатор объявления</div>;
-  }
+  if (adQuery.isLoading || listQuery.isLoading)
+    return <div style={{ padding: 20 }}>Загрузка…</div>;
+  if (adQuery.isError || !adQuery.data)
+    return <div style={{ padding: 20 }}>Объявление не найдено</div>;
 
-  if (isLoading) return <div style={{ padding: 20 }}>Загрузка...</div>;
-  if (isError || !data) return <div style={{ padding: 20 }}>Ошибка загрузки объявления</div>;
+  const ad = adQuery.data;
+  const images = ad.images ?? [];
 
-  const ad = data;
+  const nextImg = () => setImgIndex((i) => (i + 1 < images.length ? i + 1 : 0));
+  const prevImg = () => setImgIndex((i) => (i - 1 >= 0 ? i - 1 : images.length - 1));
+
+  const adsList = listQuery.data?.ads ?? [];
+  const index = adsList.findIndex((a) => a.id === adId);
+  const prevAd = index > 0 ? adsList[index - 1] : null;
+  const nextAd = index < adsList.length - 1 ? adsList[index + 1] : null;
 
   return (
-    <div style={{ padding: 20, display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <button onClick={() => navigate(-1)}>К списку</button>
-        <div>Объявление #{ad.id}</div>
-      </div>
+    <div className="page page-layout page-item">
+      <div className="page-content">
+        <div className="panel panel-gallery">
+          {images.length ? (
+            <div className="gallery-wrapper">
+              <img src={images[imgIndex]} className="gallery-image" />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1.2fr",
-          gap: 16,
-          alignItems: "flex-start",
-        }}
-      >
-        <div
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            padding: 12,
-          }}
-        >
-          <div style={{ marginBottom: 12 }}>
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              {ad.title}
+              {images.length > 1 && (
+                <>
+                  <button className="gallery-arrow left" onClick={prevImg}>‹</button>
+                  <button className="gallery-arrow right" onClick={nextImg}>›</button>
+                </>
+              )}
             </div>
-            <div style={{ fontSize: 18 }}>{ad.price} ₽</div>
-            <div style={{ color: "#555", marginTop: 4 }}>
-              {ad.category} ·{" "}
-              {new Date(ad.createdAt).toLocaleDateString()}
+          ) : (
+            <div className="no-image">Нет изображений</div>
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">{ad.title}</div>
+          </div>
+          <div className="panel-body ad-description">
+            <div className="ad-price">{ad.price} ₽</div>
+            <div className="ad-meta">
+              Категория: {ad.category} · {new Date(ad.createdAt).toLocaleDateString()}
             </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 12,
-              overflowX: "auto",
-            }}
-          >
-            {ad.images.map((src) => (
-              <img
-                key={src}
-                src={src}
-                alt={ad.title}
-                style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: 6,
-                  objectFit: "cover",
-                }}
-              />
-            ))}
-          </div>
-
-          <div style={{ marginTop: 12 }}>
-            <h3>Описание</h3>
             <p>{ad.description}</p>
           </div>
-
-          <div style={{ marginTop: 12 }}>
-            <h3>Характеристики</h3>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 14,
-              }}
-            >
-              <tbody>
-                {Object.entries(ad.characteristics || {}).map(
-                  ([key, value]) => (
-                    <tr key={key}>
-                      <td
-                        style={{
-                          border: "1px solid #eee",
-                          padding: "4px 8px",
-                          width: "40%",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {key}
-                      </td>
-                      <td
-                        style={{
-                          border: "1px solid #eee",
-                          padding: "4px 8px",
-                        }}
-                      >
-                        {value}
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
 
-        <div style={{ display: "grid", gap: 16 }}>
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: 12,
-            }}
-          >
-            <h3>Продавец</h3>
-            <div>{ad.seller.name}</div>
-            <div>Рейтинг: {ad.seller.rating}</div>
-            <div>Объявлений: {ad.seller.totalAds}</div>
-            <div>
-              На сайте с{" "}
-              {new Date(ad.seller.registeredAt).toLocaleDateString()}
+        {ad.characteristics && (
+          <div className="panel">
+            <div className="panel-header">
+              <div className="panel-title">Характеристики</div>
             </div>
-          </div>
-
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: 12,
-            }}
-          >
-            <h3>Статус модерации</h3>
-            <div style={{ marginBottom: 8 }}>
-              Статус: {ad.status}{" "}
-              {ad.priority === "urgent" && "· срочное"}
-            </div>
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => approveMutation.mutate()}
-                disabled={approveMutation.isPending}
-              >
-                Одобрить
-              </button>
-              <button
-                onClick={() => openModal("reject")}
-                disabled={rejectMutation.isPending || changesMutation.isPending}
-                style={{ background: "#ffd6d6" }}
-              >
-                Отклонить
-              </button>
-              <button
-                onClick={() => openModal("changes")}
-                disabled={rejectMutation.isPending || changesMutation.isPending}
-                style={{ background: "#fff3cd" }}
-              >
-                На доработку
-              </button>
-            </div>
-          </div>
-
-          <div
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: 12,
-              maxHeight: 260,
-              overflowY: "auto",
-            }}
-          >
-            <h3>История модерации</h3>
-            {ad.moderationHistory.length === 0 && (
-              <div>История пуста</div>
-            )}
-            {ad.moderationHistory.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "6px 0",
-                  borderBottom: "1px solid #eee",
-                  fontSize: 14,
-                }}
-              >
-                <div>
-                  {item.moderatorName} ·{" "}
-                  {new Date(item.timestamp).toLocaleString()}
-                </div>
-                <div>Действие: {item.action}</div>
-                {item.reason && <div>Причина: {item.reason}</div>}
-                {item.comment && <div>Комментарий: {item.comment}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {modalMode && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: 16,
-              borderRadius: 8,
-              minWidth: 360,
-            }}
-          >
-            <h3>
-              {modalMode === "reject"
-                ? "Отклонение объявления"
-                : "Запрос на доработку"}
-            </h3>
-
-            <div style={{ marginTop: 8, marginBottom: 8 }}>
-              Причина:
-              <div style={{ marginTop: 4 }}>
-                {REASONS.map((r) => (
-                  <label
-                    key={r}
-                    style={{ display: "block", marginBottom: 4 }}
-                  >
-                    <input
-                      type="radio"
-                      name="reason"
-                      value={r}
-                      checked={selectedReason === r}
-                      onChange={() => setSelectedReason(r)}
-                    />{" "}
-                    {r}
-                  </label>
+            <div className="panel-body">
+              <div className="char-grid">
+                {Object.entries(ad.characteristics).map(([k, v]) => (
+                  <div key={k} className="char-row">
+                    <div className="char-key">{k}</div>
+                    <div className="char-value">{v}</div>
+                  </div>
                 ))}
               </div>
             </div>
+          </div>
+        )}
+      </div>
 
-            <div style={{ marginBottom: 8 }}>
-              Комментарий:
+      <div className="page-sidebar">
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">Продавец</div>
+          </div>
+          <div className="panel-body seller">
+            <strong>{ad.seller.name}</strong>
+            <div className="muted">Рейтинг: {ad.seller.rating}</div>
+            <div className="muted">Объявлений: {ad.seller.totalAds}</div>
+            <div className="muted">
+              На сайте с {new Date(ad.seller.registeredAt).toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">Действия</div>
+          </div>
+
+          <div className="panel-body mod-actions">
+            <button className="btn btn-approve" onClick={() => approve.mutate()}>
+              Одобрить
+            </button>
+
+            <button className="btn btn-reject" onClick={() => openModal("reject")}>
+              Отклонить
+            </button>
+
+            <button className="btn btn-request" onClick={() => openModal("request")}>
+              На доработку
+            </button>
+
+            <button className="btn btn-ghost" onClick={() => navigate("/list")}>
+              ← Назад
+            </button>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">История модерации</div>
+          </div>
+          <div className="panel-body history-grid">
+            {ad.moderationHistory?.length ? (
+              [...ad.moderationHistory].reverse().map((m) => (
+                <div key={m.id} className="history-item">
+                  <div className="history-top">
+                    <strong>{m.action}</strong> — {m.moderatorName}
+                  </div>
+                  {m.reason && <div className="history-reason">Причина: {m.reason}</div>}
+                  {m.comment && <div className="history-comment">{m.comment}</div>}
+                  <div className="history-date">{new Date(m.timestamp).toLocaleString()}</div>
+                </div>
+              ))
+            ) : (
+              <div className="muted">Нет истории.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ---- НАВИГАЦИЯ В САМОМ НИЗУ ---- */}
+      <div className="bottom-nav">
+        <button className="btn btn-ghost" disabled={!prevAd} onClick={() => navigate(`/item/${prevAd?.id}`)}>
+          ◀ Предыдущее
+        </button>
+
+        <button className="btn btn-ghost" onClick={() => navigate("/list")}>
+          К списку
+        </button>
+
+        <button className="btn btn-ghost" disabled={!nextAd} onClick={() => navigate(`/item/${nextAd?.id}`)}>
+          Следующее ▶
+        </button>
+      </div>
+
+      {modalMode && (
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{modalMode === "reject" ? "Отклонить объявление" : "На доработку"}</h3>
+              <button className="modal-close" onClick={closeModal}>✖</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="reason-list">
+                {ACTION_REASONS.map((r) => (
+                  <label key={r} className="reason-radio">
+                    <input
+                      type="radio"
+                      name="reason"
+                      checked={selectedReason === r}
+                      onChange={() => setSelectedReason(r)}
+                    />
+                    <span>{r}</span>
+                  </label>
+                ))}
+              </div>
+
               <textarea
-                rows={3}
+                className="input modal-textarea"
+                placeholder="Комментарий (необязательно)"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                style={{ width: "100%", marginTop: 4 }}
               />
+
+              <div className="modal-actions">
+                <button className="btn btn-ghost" onClick={closeModal}>Отмена</button>
+
+                <button
+                  className="btn btn-primary"
+                  disabled={!selectedReason}
+                  onClick={handleSubmit}
+                >
+                  Отправить
+                </button>
+              </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 8,
-              }}
-            >
-              <button onClick={closeModal}>Отмена</button>
-              <button
-                onClick={handleSubmitModal}
-                disabled={
-                  !selectedReason ||
-                  rejectMutation.isPending ||
-                  changesMutation.isPending
-                }
-              >
-                Отправить
-              </button>
-            </div>
           </div>
         </div>
       )}
